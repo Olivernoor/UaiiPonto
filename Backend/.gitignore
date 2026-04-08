@@ -1,0 +1,50 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Node modules
+node_modules/
+package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Laravel
+/vendor/
+/bootstrap/cache/
+/storage/
+.phpunit.result.cache
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Database
+database.sqlite
+*.sqlite
+*.sqlite3
+
+# Compiled assets
+/public/hot
+/public/storage
+/public/js
+/public/css
+
+# Misc
+.env.backup
+.env.production.backup
+.phpcs.xml
+.phpmnd.xml
+phpstan.neon.dist
+
+# Cache
+.cache/
