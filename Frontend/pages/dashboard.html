@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - UaiiPonto</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .dashboard-container {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      padding: 40px;
+      max-width: 900px;
+      width: 90%;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+      border-bottom: 2px solid #f0f0f0;
+      padding-bottom: 20px;
+    }
+
+    .header h1 {
+      color: #667eea;
+      font-size: 28px;
+    }
+
+    .user-info {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .user-info p {
+      color: #666;
+      font-size: 14px;
+    }
+
+    .user-info strong {
+      color: #333;
+    }
+
+    .logout-btn {
+      background: #ff6b6b;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.3s;
+    }
+
+    .logout-btn:hover {
+      background: #ff5252;
+    }
+
+    .content {
+      text-align: center;
+      color: #666;
+    }
+
+    .content p {
+      font-size: 18px;
+      margin-bottom: 20px;
+    }
+
+    #feedback {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 5px;
+      display: none;
+    }
+
+    #feedback.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+      display: block;
+    }
+
+    #feedback.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-container">
+    <div class="header">
+      <h1>📊 UaiiPonto Dashboard</h1>
+      <button class="logout-btn" onclick="handleLogout()">Logout</button>
+    </div>
+
+    <div class="user-info" id="user-info">
+      <p>Carregando informações do usuário...</p>
+    </div>
+
+    <div class="content">
+      <p>Bem-vindo ao seu painel!</p>
+      <p>Aqui você pode gerenciar seus dados e configurações.</p>
+    </div>
+
+    <div id="feedback"></div>
+  </div>
+
+  <script src="../js/apiConfig.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      const user = localStorage.getItem('user');
+      const userInfo = document.getElementById('user-info');
+      const feedback = document.getElementById('feedback');
+
+      if (!user) {
+        userInfo.innerHTML = '<p style="color: red;">Você não está autenticado. Redirecionando...</p>';
+        setTimeout(() => {
+          window.location.href = 'login.html';
+        }, 2000);
+        return;
+      }
+
+      try {
+        const userData = JSON.parse(user);
+        userInfo.innerHTML = `
+          <p><strong>Nome:</strong> ${userData.name}</p>
+          <p><strong>E-mail:</strong> ${userData.email}</p>
+          <p><strong>Organização:</strong> ${userData.organization || 'N/A'}</p>
+          <p><strong>Função:</strong> ${userData.role || 'user'}</p>
+        `;
+      } catch (error) {
+        userInfo.innerHTML = '<p style="color: red;">Erro ao carregar dados do usuário</p>';
+      }
+    });
+
+    async function handleLogout() {
+      try {
+        const result = await logout();
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        window.location.href = 'login.html';
+      } catch (error) {
+        document.getElementById('feedback').textContent = 'Erro ao fazer logout';
+        document.getElementById('feedback').className = 'error';
+      }
+    }
+  </script>
+</body>
+</html>
