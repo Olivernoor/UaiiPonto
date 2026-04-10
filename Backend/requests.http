@@ -1,4 +1,6 @@
 ### Configuração Base
+@rodarfront=  php -S localhost:3000
+@rodarback= php artisan serve 
 @baseUrl = http://localhost:8000
 @token = 
 
