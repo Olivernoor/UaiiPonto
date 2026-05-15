@@ -27,6 +27,10 @@ class Authenticate extends Middleware
      */
     protected function guards(Request $request): array
     {
+        // Para API, usar sanctum; para web, usar web
+        if ($request->is('api/*') || $request->expectsJson()) {
+            return ['sanctum'];
+        }
         return ['web'];
     }
 }

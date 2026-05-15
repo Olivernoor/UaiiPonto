@@ -40,6 +40,11 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        'sanctum' => [
+            'driver' => 'sanctum',
+            'provider' => 'users',
+        ],
     ],
 
     /*
@@ -103,5 +108,20 @@ return [
     */
 
     'password_confirmation_timeout' => 10800,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Authentication Drivers
+    |--------------------------------------------------------------------------
+    |
+    | Custom driver definitions for authentication mechanisms.
+    |
+    */
+
+    'drivers' => [
+        'sanctum' => [
+            'provider' => 'users',
+        ],
+    ],
 
 ];

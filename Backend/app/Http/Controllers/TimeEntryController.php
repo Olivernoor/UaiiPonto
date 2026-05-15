@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Validator;
 class TimeEntryController extends Controller
 {
     /**
-     * Registrar check-in do usuário
+     * Registrar batida de ponto (suporta 4 tipos: check_in, lunch_out, lunch_in, check_out)
      */
     public function checkIn(Request $request): JsonResponse
     {
@@ -24,32 +24,48 @@ class TimeEntryController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
+            'type' => 'nullable|string|in:check_in,lunch_out,lunch_in,check_out',
             'notes' => 'nullable|string|max:500',
+            'location' => 'nullable|string|max:255',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $checkIn = Carbon::now();
+        $type = $request->type ?? 'check_in';
+        $timestamp = Carbon::now();
 
-        // Validar check-in
-        $errors = TimeEntry::validateCheckIn($checkIn);
-        if (!empty($errors)) {
-            return response()->json(['errors' => $errors], 422);
+        try {
+            // Validar tipo de batida e a lógica associada
+            $errors = TimeEntry::validateEntryType($type, $user->id, $timestamp);
+            if (!empty($errors)) {
+                return response()->json(['errors' => $errors], 422);
+            }
+
+            // Criar registro de batida
+            $timeEntry = TimeEntry::create([
+                'user_id' => $user->id,
+                'type' => $type,
+                'check_in' => $timestamp,
+                'notes' => $request->notes ?? null,
+                'location' => $request->location ?? null,
+                'latitude' => $request->latitude ?? null,
+                'longitude' => $request->longitude ?? null,
+            ]);
+
+            return response()->json([
+                'message' => "Batida ($type) registrada com sucesso",
+                'data' => $timeEntry,
+            ], 201);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erro ao registrar batida',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        // Criar registro de batida
-        $timeEntry = TimeEntry::create([
-            'user_id' => $user->id,
-            'check_in' => $checkIn,
-            'notes' => $request->notes ?? null,
-        ]);
-
-        return response()->json([
-            'message' => 'Check-in registrado com sucesso',
-            'data' => $timeEntry,
-        ], 201);
     }
 
     /**
@@ -57,44 +73,51 @@ class TimeEntryController extends Controller
      */
     public function checkOut(Request $request): JsonResponse
     {
-        $user = Auth::user();
+        try {
+            $user = Auth::user();
 
-        if (!$user) {
-            return response()->json(['message' => 'Não autenticado'], 401);
+            if (!$user) {
+                return response()->json(['message' => 'Não autenticado'], 401);
+            }
+
+            // Encontrar a última batida aberta do usuário
+            $timeEntry = TimeEntry::where('user_id', $user->id)
+                ->where('check_out', null)
+                ->latest('check_in')
+                ->first();
+
+            if (!$timeEntry) {
+                return response()->json(['message' => 'Nenhuma batida aberta encontrada'], 404);
+            }
+
+            $checkOut = Carbon::now();
+
+            // Validar check-out
+            $errors = TimeEntry::validateCheckOut($timeEntry, $checkOut);
+            if (!empty($errors)) {
+                return response()->json(['errors' => $errors], 422);
+            }
+
+            // Atualizar registro
+            $timeEntry->check_out = $checkOut;
+            $timeEntry->worked_hours = $timeEntry->calculateWorkedHours();
+            $timeEntry->status = $timeEntry->determineStatus();
+            $timeEntry->save();
+
+            return response()->json([
+                'message' => 'Check-out registrado com sucesso',
+                'data' => $timeEntry,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erro ao registrar check-out',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        // Encontrar batida aberta do usuário
-        $timeEntry = TimeEntry::where('user_id', $user->id)
-            ->whereNull('check_out')
-            ->latest('check_in')
-            ->first();
-
-        if (!$timeEntry) {
-            return response()->json(['message' => 'Nenhuma batida aberta encontrada'], 404);
-        }
-
-        $checkOut = Carbon::now();
-
-        // Validar check-out
-        $errors = TimeEntry::validateCheckOut($timeEntry, $checkOut);
-        if (!empty($errors)) {
-            return response()->json(['errors' => $errors], 422);
-        }
-
-        // Atualizar registro
-        $timeEntry->check_out = $checkOut;
-        $timeEntry->worked_hours = $timeEntry->calculateWorkedHours();
-        $timeEntry->status = $timeEntry->determineStatus();
-        $timeEntry->save();
-
-        return response()->json([
-            'message' => 'Check-out registrado com sucesso',
-            'data' => $timeEntry,
-        ], 200);
     }
 
     /**
-     * Obter batida de hoje do usuário
+     * Obter batidas de hoje do usuário (check_in, lunch_out, lunch_in, check_out)
      */
     public function todayEntry(): JsonResponse
     {
@@ -104,15 +127,38 @@ class TimeEntryController extends Controller
             return response()->json(['message' => 'Não autenticado'], 401);
         }
 
-        $entry = TimeEntry::where('user_id', $user->id)
+        // Obter todas as batidas de hoje
+        $entries = TimeEntry::where('user_id', $user->id)
             ->whereDate('check_in', Carbon::today())
-            ->first();
+            ->orderBy('check_in')
+            ->get();
 
-        if (!$entry) {
-            return response()->json(['message' => 'Nenhuma batida para hoje'], 404);
+        // Formatar resposta com status de cada tipo
+        $status = [
+            'check_in' => null,
+            'lunch_out' => null,
+            'lunch_in' => null,
+            'check_out' => null,
+        ];
+
+        $totalEntries = [];
+
+        foreach ($entries as $entry) {
+            $checkInTime = is_string($entry->check_in) ? Carbon::parse($entry->check_in) : $entry->check_in;
+            $status[$entry->type] = [
+                'time' => $checkInTime->format('H:i:s'),
+                'location' => $entry->location,
+                'latitude' => $entry->latitude,
+                'longitude' => $entry->longitude,
+                'id' => $entry->id,
+            ];
+            $totalEntries[] = $entry;
         }
 
-        return response()->json($entry, 200);
+        return response()->json([
+            'status' => $status,
+            'entries' => $totalEntries,
+        ], 200);
     }
 
     /**
@@ -238,5 +284,78 @@ class TimeEntryController extends Controller
             ->paginate($perPage, ['*'], 'page', $page);
 
         return response()->json($entries, 200);
+    }
+
+    /**
+     * Exportar dados de batidas para Excel (JSON que será convertido no frontend)
+     */
+    public function exportExcel(): JsonResponse
+    {
+        $user = Auth::user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Não autenticado'], 401);
+        }
+
+        // Obter todas as batidas do usuário
+        $entries = TimeEntry::where('user_id', $user->id)
+            ->orderBy('check_in')
+            ->get();
+
+        // Formatar dados para Excel
+        $data = [];
+        
+        foreach ($entries as $entry) {
+            // Converter check_in para Carbon se necessário
+            $checkInTime = is_string($entry->check_in) ? Carbon::parse($entry->check_in) : $entry->check_in;
+            
+            $data[] = [
+                'Data' => $checkInTime->format('d/m/Y'),
+                'Tipo' => $this->getTypeLabel($entry->type),
+                'Hora' => $checkInTime->format('H:i:s'),
+                'Localização' => $entry->location ?? 'N/A',
+                'Latitude' => $entry->latitude ?? 'N/A',
+                'Longitude' => $entry->longitude ?? 'N/A',
+                'Horas Trabalhadas' => $entry->worked_hours ?? 'N/A',
+                'Status' => $entry->status,
+                'Notas' => $entry->notes ?? 'N/A',
+            ];
+        }
+
+        // Calcular período
+        $firstEntry = $entries->first();
+        $lastEntry = $entries->last();
+        $startDate = $firstEntry ? (is_string($firstEntry->check_in) ? Carbon::parse($firstEntry->check_in) : $firstEntry->check_in) : null;
+        $endDate = $lastEntry ? (is_string($lastEntry->check_in) ? Carbon::parse($lastEntry->check_in) : $lastEntry->check_in) : null;
+
+        return response()->json([
+            'usuario' => [
+                'nome' => $user->name,
+                'email' => $user->email,
+                'organização' => $user->organization,
+            ],
+            'data_exportacao' => now()->format('d/m/Y H:i:s'),
+            'periodo' => [
+                'inicio' => $startDate ? $startDate->format('d/m/Y') : 'N/A',
+                'fim' => $endDate ? $endDate->format('d/m/Y') : 'N/A',
+            ],
+            'dados' => $data,
+            'total_registros' => count($data),
+        ], 200);
+    }
+
+    /**
+     * Converter tipo de batida para label legível
+     */
+    private function getTypeLabel(string $type): string
+    {
+        $labels = [
+            'check_in' => 'Entrada',
+            'lunch_out' => 'Saída Almoço',
+            'lunch_in' => 'Volta Almoço',
+            'check_out' => 'Saída Final',
+        ];
+
+        return $labels[$type] ?? $type;
     }
 }

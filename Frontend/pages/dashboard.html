@@ -2,167 +2,155 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
   <title>Dashboard - UaiiPonto</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .dashboard-container {
-      background: white;
-      border-radius: 10px;
-      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-      padding: 40px;
-      max-width: 900px;
-      width: 90%;
-    }
-
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 30px;
-      border-bottom: 2px solid #f0f0f0;
-      padding-bottom: 20px;
-    }
-
-    .header h1 {
-      color: #667eea;
-      font-size: 28px;
-    }
-
-    .user-info {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .user-info p {
-      color: #666;
-      font-size: 14px;
-    }
-
-    .user-info strong {
-      color: #333;
-    }
-
-    .logout-btn {
-      background: #ff6b6b;
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 14px;
-      transition: background 0.3s;
-    }
-
-    .logout-btn:hover {
-      background: #ff5252;
-    }
-
-    .content {
-      text-align: center;
-      color: #666;
-    }
-
-    .content p {
-      font-size: 18px;
-      margin-bottom: 20px;
-    }
-
-    #feedback {
-      margin-top: 20px;
-      padding: 15px;
-      border-radius: 5px;
-      display: none;
-    }
-
-    #feedback.success {
-      background: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
-      display: block;
-    }
-
-    #feedback.error {
-      background: #f8d7da;
-      color: #721c24;
-      border: 1px solid #f5c6cb;
-      display: block;
-    }
-  </style>
+  <!-- Leaflet CSS para o mapa -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="../css/dashboard.css">
 </head>
-<body>
-  <div class="dashboard-container">
-    <div class="header">
-      <h1>📊 UaiiPonto Dashboard</h1>
-      <button class="logout-btn" onclick="handleLogout()">Logout</button>
+<body class="dashboard-body">
+  <div class="dashboard-wrapper">
+    <!-- Header -->
+    <div class="main-header">
+      <div class="logo-area">
+        <h1>UaiiPonto</h1>
+      </div>
+      <div class="user-welcome">
+        Olá, <span id="user-name-welcome">Carregando...</span>
+      </div>
     </div>
 
-    <div class="user-info" id="user-info">
-      <p>Carregando informações do usuário...</p>
+    <!-- Navegação -->
+    <div class="nav-tabs">
+      <button class="nav-btn active" data-page="registro">📋 Registrar</button>
+      <button class="nav-btn" data-page="historico">📜 Histórico</button>
+      <button class="nav-btn" data-page="relatorio">📊 Relatórios</button>
+      <button class="nav-btn" data-page="config">⚙️ Configurações</button>
     </div>
 
-    <div class="content">
-      <p>Bem-vindo ao seu painel!</p>
-      <p>Aqui você pode gerenciar seus dados e configurações.</p>
+    <!-- Página Registrar (Principal) -->
+    <div id="page-registro" class="page-content">
+      <div class="registro-grid">
+        <!-- Coluna Esquerda -->
+        <div>
+          <div class="card-ponto">
+            <div class="card-title">🎯 Registrar Ponto</div>
+            <button class="btn-registrar" id="btn-registrar-ponto">
+              <span id="proxima-batida-label">Registrar Entrada</span>
+            </button>
+            
+            <!-- Mapa com círculo da área permitida -->
+            <div id="mapa" class="mapa-container"></div>
+            
+            <!-- Status da área -->
+            <div id="status-area" class="localizacao-status" style="background: #f3e8ff; margin-top: 10px;">
+              <span>📍 Localização: Opcional</span>
+            </div>
+            
+            <!-- Geolocalização -->
+            <div class="localizacao-status">
+              <span class="feedback-loc" id="feedback-localizacao">📍 Clique para ativar localização</span>
+              <button class="btn-localizacao" id="btn-ativar-localizacao">📍 Ativar Localização</button>
+            </div>
+            
+            <!-- Endereço da MATRIZ (FAEX) -->
+            <div id="matriz-endereco" style="margin-top: 15px; padding: 12px; background: #f8f0ff; border-radius: 8px; font-size: 13px; color: #555;">
+              <strong>📍 Referência da Empresa:</strong><br>FAEX - Faculdade de Extrema
+            </div>
+            
+            <p style="font-size: 12px; color:#888; margin-top: 10px;">
+              💡 A localização é opcional - você pode registrar ponto de qualquer lugar
+            </p>
+          </div>
+        </div>
+
+        <!-- Coluna Direita -->
+        <div>
+          <div class="card-ponto">
+            <div class="card-title">📆 Status de Hoje</div>
+            <div class="status-hoje">
+              <div class="status-linha">
+                <span class="status-label">Entrada</span>
+                <span class="status-valor" id="status-entrada">--:--</span>
+              </div>
+              <div class="status-linha">
+                <span class="status-label">Saída Almoço</span>
+                <span class="status-valor" id="status-saida-almoco">--:--</span>
+              </div>
+              <div class="status-linha">
+                <span class="status-label">Volta Almoço</span>
+                <span class="status-valor" id="status-volta-almoco">--:--</span>
+              </div>
+              <div class="status-linha">
+                <span class="status-label">Saída</span>
+                <span class="status-valor" id="status-saida">--:--</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-ponto" style="margin-top: 20px;">
+            <div class="card-title">📋 Histórico de Hoje</div>
+            <ul class="batidas-list" id="historico-hoje-lista">
+              <li style="text-align:center;">Nenhuma batida hoje</li>
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div id="feedback"></div>
+    <!-- Página Histórico -->
+    <div id="page-historico" class="page-content" style="display: none;">
+      <div class="historico-card">
+        <div class="card-title">📜 Histórico Completo de Batidas</div>
+        <div id="historico-completo-list"></div>
+      </div>
+    </div>
+
+    <!-- Página Relatórios -->
+    <div id="page-relatorio" class="page-content" style="display: none;">
+      <div class="relatorio-card">
+        <div class="card-title">📊 Relatório de Pontos</div>
+        <div style="padding: 20px; background: #f5f5f5; border-radius: 8px; text-align: center;">
+          <p style="margin-bottom: 15px;">Clique no botão abaixo para gerar um relatório em Excel com todas as suas batidas de ponto.</p>
+          <button class="btn-registrar" id="btn-relatorio" style="width: 100%; max-width: 300px;">
+            📥 Baixar Relatório em Excel
+          </button>
+        </div>
+        <div id="relatorio-conteudo"></div>
+      </div>
+    </div>
+
+    <!-- Página Configurações -->
+    <div id="page-config" class="page-content" style="display: none;">
+      <div class="config-card">
+        <div class="card-title">⚙️ Configurações da Conta</div>
+        <div class="config-item">
+          <label>👤 Nome de Exibição</label>
+          <input type="text" id="config-nome" placeholder="Seu nome">
+        </div>
+        <div class="config-item">
+          <label>🔔 Notificações</label>
+          <select id="config-notificacoes">
+            <option value="true">Ativado</option>
+            <option value="false">Desativado</option>
+          </select>
+        </div>
+        <button class="btn-salvar-config" id="btn-salvar-config">💾 Salvar Alterações</button>
+      </div>
+    </div>
+
+    <!-- Rodapé com botão Sair -->
+    <div class="logout-footer">
+      <button class="btn-sair" id="btn-logout">🚪 Sair da Conta</button>
+    </div>
+
+    <!-- Feedback global -->
+    <div id="global-feedback" class="feedback-msg"></div>
   </div>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="../js/apiConfig.js"></script>
-  <script>
-    document.addEventListener("DOMContentLoaded", async () => {
-      const user = localStorage.getItem('user');
-      const userInfo = document.getElementById('user-info');
-      const feedback = document.getElementById('feedback');
-
-      if (!user) {
-        userInfo.innerHTML = '<p style="color: red;">Você não está autenticado. Redirecionando...</p>';
-        setTimeout(() => {
-          window.location.href = 'login.html';
-        }, 2000);
-        return;
-      }
-
-      try {
-        const userData = JSON.parse(user);
-        userInfo.innerHTML = `
-          <p><strong>Nome:</strong> ${userData.name}</p>
-          <p><strong>E-mail:</strong> ${userData.email}</p>
-          <p><strong>Organização:</strong> ${userData.organization || 'N/A'}</p>
-          <p><strong>Função:</strong> ${userData.role || 'user'}</p>
-        `;
-      } catch (error) {
-        userInfo.innerHTML = '<p style="color: red;">Erro ao carregar dados do usuário</p>';
-      }
-    });
-
-    async function handleLogout() {
-      try {
-        const result = await logout();
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
-        window.location.href = 'login.html';
-      } catch (error) {
-        document.getElementById('feedback').textContent = 'Erro ao fazer logout';
-        document.getElementById('feedback').className = 'error';
-      }
-    }
-  </script>
+  <script src="../js/dashboard-novo.js"></script>
 </body>
 </html>

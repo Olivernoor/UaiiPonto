@@ -1,5 +1,6 @@
+// Sistema conecta com o backend via API real
+
 document.addEventListener("DOMContentLoaded", () => {
-  // Verificar qual página estamos
   const isLoginPage = document.querySelector(".login-card");
   const isRegisterPage = document.querySelector(".cadastro-card");
 
@@ -16,12 +17,21 @@ document.addEventListener("DOMContentLoaded", () => {
  * Configurar formulário de login
  */
 function setupLoginForm() {
-  const form = document.querySelector(".login-card");
+  const togglePassword = document.querySelector(".toggle-password");
   const passwordInput = document.querySelector("#password");
+  const form = document.querySelector(".login-card");
   const feedback = document.createElement("div");
   feedback.id = "feedback";
-  feedback.style.marginTop = "15px";
   form.appendChild(feedback);
+
+  // Toggle para mostrar/esconder senha
+  if (togglePassword) {
+    togglePassword.addEventListener("click", () => {
+      const type = passwordInput.getAttribute("type") === "password" ? "text" : "password";
+      passwordInput.setAttribute("type", type);
+      togglePassword.textContent = type === "password" ? "👁️" : "🙈";
+    });
+  }
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -34,32 +44,24 @@ function setupLoginForm() {
       return;
     }
 
-    showFeedback(feedback, "Carregando...", "");
+    showFeedback(feedback, "Verificando credenciais...", "");
 
-    try {
-      const result = await login(email, password);
+    // Fazer login via API real
+    const result = await loginWrapper(email, password);
+    
+    if (result.success) {
+      showFeedback(feedback, "Login realizado com sucesso!", "success");
+      
+      // Salvar token e usuário no localStorage
+      localStorage.setItem(API_CONFIG.STORAGE_KEYS.TOKEN, result.data.token);
+      localStorage.setItem(API_CONFIG.STORAGE_KEYS.USER, JSON.stringify(result.data.user));
 
-      if (result.success) {
-        showFeedback(feedback, "Login realizado com sucesso!", "success");
-
-        // Armazenar token
-        if (result.data.token) {
-          localStorage.setItem("token", result.data.token);
-        }
-
-        // Armazenar dados do usuário
-        if (result.data.user) {
-          localStorage.setItem("user", JSON.stringify(result.data.user));
-        }
-
-        setTimeout(() => {
-          window.location.href = "dashboard.html";
-        }, 1500);
-      } else {
-        showFeedback(feedback, result.error || "Credenciais inválidas.", "error");
-      }
-    } catch (error) {
-      showFeedback(feedback, "Erro de conexão com servidor.", "error");
+      // Redirecionar para o dashboard
+      setTimeout(() => {
+        window.location.href = "dashboard.html";
+      }, 1500);
+    } else {
+      showFeedback(feedback, result.error || "E-mail ou senha inválidos!", "error");
     }
   });
 }
@@ -69,7 +71,12 @@ function setupLoginForm() {
  */
 function setupRegisterForm() {
   const form = document.querySelector(".cadastro-card");
-  const feedback = form.querySelector("#feedback");
+  const feedback = form.querySelector("#feedback") || (() => {
+    const f = document.createElement("div");
+    f.id = "feedback";
+    form.appendChild(f);
+    return f;
+  })();
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -80,7 +87,6 @@ function setupRegisterForm() {
     const password = document.querySelector("#senha").value.trim();
     const passwordConfirm = document.querySelector("#confirmar-senha").value.trim();
 
-    // Validações
     if (!name || !email || !organization || !password || !passwordConfirm) {
       showFeedback(feedback, "Por favor, preencha todos os campos!", "error");
       return;
@@ -98,28 +104,88 @@ function setupRegisterForm() {
 
     showFeedback(feedback, "Criando conta...", "");
 
-    try {
-      const result = await register({
-        name,
-        email,
-        organization,
-        password,
-        password_confirmation: passwordConfirm,
-      });
-
-      if (result.success) {
-        showFeedback(feedback, "Cadastro realizado com sucesso! Redirecionando para login...", "success");
-        
-        setTimeout(() => {
-          window.location.href = "login.html";
-        }, 2000);
-      } else {
-        showFeedback(feedback, result.error || "Erro ao criar conta.", "error");
-      }
-    } catch (error) {
-      showFeedback(feedback, "Erro de conexão com servidor.", "error");
+    // Registrar via API real
+    const result = await registerWrapper({ name, email, organization, password });
+    
+    if (result.success) {
+      showFeedback(feedback, "Cadastro realizado com sucesso! Redirecionando para login...", "success");
+      setTimeout(() => {
+        window.location.href = "login.html";
+      }, 2000);
+    } else {
+      showFeedback(feedback, result.error || "Erro ao criar conta. Tente novamente.", "error");
     }
   });
+}
+
+/**
+ * Função de login - chama a API real
+ */
+async function loginWrapper(email, password) {
+  const result = await apiRequest(API_CONFIG.ENDPOINTS.LOGIN, {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+  
+  if (result.success) {
+    return {
+      success: true,
+      data: result.data
+    };
+  } else {
+    return {
+      success: false,
+      error: result.error
+    };
+  }
+}
+
+/**
+ * Função de registro - chama a API real
+ */
+async function registerWrapper(userData) {
+  const result = await apiRequest(API_CONFIG.ENDPOINTS.REGISTER, {
+    method: 'POST',
+    body: JSON.stringify(userData),
+  });
+  
+  if (result.success) {
+    return {
+      success: true,
+      data: result.data
+    };
+  } else {
+    return {
+      success: false,
+      error: result.error
+    };
+  }
+}
+
+/**
+ * Função de logout - chama a API real
+ */
+async function logoutWrapper() {
+  const result = await apiRequest(API_CONFIG.ENDPOINTS.LOGOUT, {
+    method: 'POST',
+  });
+  
+  // Limpar dados locais sempre (mesmo se API falhar)
+  localStorage.removeItem(API_CONFIG.STORAGE_KEYS.TOKEN);
+  localStorage.removeItem(API_CONFIG.STORAGE_KEYS.USER);
+  
+  return {
+    success: result.success,
+    error: result.error
+  };
+}
+
+/**
+ * Fazer logout e redirecionar
+ */
+async function logout() {
+  await logoutWrapper();
+  window.location.href = "login.html";
 }
 
 /**
@@ -128,11 +194,9 @@ function setupRegisterForm() {
 function showFeedback(element, message, type) {
   element.textContent = message;
   element.className = type;
-  if (type) {
-    element.style.padding = "12px";
-    element.style.borderRadius = "5px";
-    element.style.marginTop = "15px";
-  }
+  element.style.padding = "12px";
+  element.style.borderRadius = "5px";
+  element.style.marginTop = "15px";
 
   if (type === "success") {
     element.style.background = "#d4edda";

@@ -48,12 +48,13 @@ class UserController extends Controller
 
         if (Auth::attempt($credentials)) {
             $user = Auth::user();
-            $user = $user->only(['id', 'name', 'email', 'organization', 'role']);
+            $token = $user->createToken('auth_token')->plainTextToken;
 
             return response()->json([
                 'success' => true,
                 'message' => 'Login realizado com sucesso',
-                'user' => $user,
+                'token' => $token,
+                'user' => $user->only(['id', 'name', 'email', 'organization', 'role']),
             ], 200);
         }
 
@@ -69,9 +70,7 @@ class UserController extends Controller
      */
     public function logout(Request $request)
     {
-        Auth::logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        $request->user()->currentAccessToken()->delete();
 
         return response()->json([
             'success' => true,
